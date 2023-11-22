@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	
+	
+<mapper namespace="com.project.auction.mappers.auction" >
+	
+	<insert id="insertAuction" parameterType="Auction">
+		INSERT INTO KNAuction
+				(id, name, content, regdate, startdate, enddate, startprice, endprice, img, count)
+			VALUES 
+				(#{id}, #{name}, #{content}, SYSDATE(), 
+				#{startDate}, #{endDate}, #{startPrice}, #{startPrice}, #{img}, 0)
+	</insert>
+	
+	<select id="getAuctionList" parameterType="hashmap" resultType="Auction">
+		SELECT 
+			no,
+			id,
+			name,
+			content,
+			regdate AS regDate,
+			startdate AS startDate,
+			enddate AS endDate,
+			startprice AS startPrice,
+			endprice AS endPrice,
+			img,
+			buyer,
+			count
+		FROM KNAuction
+			<choose>
+				<when test="period == 'progress'">
+					WHERE startDate &lt; CURRENT_TIMESTAMP()
+						AND endDate > CURRENT_TIMESTAMP()
+						<if test="keyword != 'null'">
+							AND (id LIKE CONCAT('%', #{keyword}, '%')
+								OR name LIKE CONCAT('%', #{keyword}, '%'))
+						</if>
+				</when>
+				<when test="period == 'upcoming'">
+					WHERE startDate > CURRENT_TIMESTAMP()
+						<if test="keyword != 'null'">
+							AND (id LIKE CONCAT('%', #{keyword}, '%')
+								OR name LIKE CONCAT('%', #{keyword}, '%'))
+						</if>
+				</when>
+				<when test="period == 'expire'">
+					WHERE endDate &lt; CURRENT_TIMESTAMP()
+						<if test="keyword != 'null'">
+							AND (id LIKE CONCAT('%', #{keyword}, '%')
+								OR name LIKE CONCAT('%', #{keyword}, '%'))
+						</if>
+				</when>
+			</choose>
+			<if test="printType == 'new'">
+				 ORDER BY no DESC
+			</if>
+			<if test="printType == 'endDateUp'">
+				 ORDER BY endDate 
+			</if>
+			<if test="printType == 'endDateDown'">
+				 ORDER BY endDate DESC
+			</if>
+			<if test="printType == 'priceUp'">
+				 ORDER BY endPrice DESC
+			</if>
+			<if test="printType == 'priceDown'">
+				 ORDER BY endPrice
+			</if>
+			<if test="printType == 'countUp'">
+				 ORDER BY count
+			</if>
+			<if test="printType == 'countDown'">
+				 ORDER BY count DESC
+			</if>
+			LIMIT #{startPage}, #{num}
+	</select>
+	
+	<select id="getAuction" resultType="Auction">
+		SELECT 
+			no,
+			id,
+			name,
+			content,
+			regdate AS regDate,
+			startdate AS startDate,
+			enddate AS endDate,
+			startprice AS startPrice,
+			endprice AS endPrice,
+			img,
+			buyer,
+			count
+		FROM KNAuction
+			WHERE no = #{no}
+	</select>
+
+	<update id="updateEndPrice" parameterType="hashmap">
+		UPDATE KNAuction
+			SET 
+				endprice = #{endPrice},
+				buyer = #{buyer},
+				count = count + 1,
+				bidder = JSON_SET(COALESCE(bidder, '{}'), CONCAT('$.', #{buyer}), #{endPrice})
+			WHERE no = #{no}
+	</update>
+	
+	<update id="updateAuction" parameterType="Auction">
+		UPDATE KNAuction
+			SET
+				name = #{name},
+				content = #{content},
+				regdate = SYSDATE(),
+				startdate = #{startDate},
+				enddate = #{endDate},
+				startprice = #{startPrice}
+				<if test="img != null">
+					, img = #{img}
+				</if>
+			WHERE no = #{no}
+	</update>
+	
+	<delete id="deleteAuction">
+		DELETE FROM KNAuction WHERE no = #{no}
+	</delete>
+	
+	<insert id="insertBoard" parameterType="FindBoard">
+		INSERT INTO KNfind
+			(id, title, content, reg_date)
+			VALUES (#{id}, #{title}, #{content}, SYSDATE())
+	</insert>
+	
+	<select id="getBoardList" resultMap="boardResultMap">
+	    SELECT * FROM KNfind
+	    <if test="id == 'null'">
+	        <if test="keyword != 'null'">
+	            WHERE id LIKE CONCAT('%', #{keyword}, '%')
+	            OR title LIKE CONCAT('%', #{keyword}, '%')
+	            OR content LIKE CONCAT('%', #{keyword}, '%')
+	        </if>
+	    </if>
+	    <if test="id != 'null'">
+	        WHERE id = #{id}
+	    </if>
+	    ORDER BY no DESC
+	</select>
+	
+	<select id="getBoard" resultMap="boardResultMap">
+		SELECT
+			*
+		FROM KNfind
+			WHERE no = #{no}
+	</select>
+	
+	<update id="updateBoard" parameterType="FindBoard">
+		UPDATE KNfind
+			SET
+				title = #{title},
+				content = #{content},
+				reg_date = SYSDATE()
+			WHERE no = #{no}
+	</update>
+	
+	<delete id="deleteBoard">
+		DELETE FROM KNFind
+			WHERE no = #{no}
+	</delete>
+	
+	<insert id="insertReply" parameterType="Reply">
+		INSERT INTO KNReply
+			(id, content, reg_date, board_no)
+			VALUES (#{id}, #{content}, SYSDATE(), #{boardNo})
+	</insert>
+	
+	<update id="updateReply" parameterType="Reply">
+		UPDATE KNReply
+			SET 
+				content = #{content},
+				reg_date = SYSDATE()
+			WHERE
+				no = #{no}
+	</update>
+	
+	<delete id="deleteReply">
+		DELETE FROM KNReply
+			WHERE no = #{no}
+	</delete>
+
+	<select id="getReplyList" resultMap="replyResultMap">
+		SELECT * FROM KNReply 
+			WHERE board_no = #{boardNo}
+			ORDER BY no DESC
+	</select>
+	
+	<select id="getMyAuctionList" parameterType="hashmap" resultType="Auction">
+		SELECT 
+			no,
+			id,
+			name,
+			content,
+			regDate,
+			startDate,
+			endDate,
+			startPrice,
+			endPrice,
+			img,
+			buyer,
+			count
+		FROM KNAuction
+			<choose>
+				<when test="option == 'bid'">
+					WHERE JSON_extract(bidder, CONCAT('$**.', #{id}))
+				</when>
+				<when test="option == 'exhibit'">
+					WHERE id = #{id}
+				</when>
+			</choose>
+	</select>
+
+	<select id="getAuctionCount" resultType="int">
+	    SELECT count(*) FROM KNAuction
+	    <choose>
+	        <when test="period == 'progress'">
+	            WHERE startDate &lt; CURRENT_TIMESTAMP()
+	                AND endDate > CURRENT_TIMESTAMP()
+	                <if test="keyword != 'null'">
+	                    AND (id LIKE CONCAT('%', #{keyword}, '%')
+	                        OR name LIKE CONCAT('%', #{keyword}, '%'))
+	                </if>
+	        </when>
+	        <when test="period == 'upcoming'">
+	            WHERE startDate > CURRENT_TIMESTAMP()
+	                <if test="keyword != 'null'">
+	                    AND (id LIKE CONCAT('%', #{keyword}, '%')
+	                        OR name LIKE CONCAT('%', #{keyword}, '%'))
+	                </if>
+	        </when>
+	        <when test="period == 'expire'">
+	            WHERE endDate &lt; CURRENT_TIMESTAMP()
+	                <if test="keyword != 'null'">
+	                    AND (id LIKE CONCAT('%', #{keyword}, '%')
+	                        OR name LIKE CONCAT('%', #{keyword}, '%'))
+	                </if>
+	        </when>
+	    </choose>
+	</select>
+
+	
+	<select id="getCommissionList" resultType="Auction">
+		SELECT 
+			no,
+			id,
+			name,
+			endDate,
+			endPrice,
+			buyer,
+			deposit_status AS depositStatus,
+			deposit_date AS depositDate,
+			delivery_status AS deliveryStatus,
+			delivery_date AS deliveryDate,
+			remit_status AS remitStatus,
+			remit_date AS remitDate
+		FROM KNAuction
+			WHERE endDate &lt; CURRENT_TIMESTAMP()
+				AND buyer IS NOT NULL
+			ORDER BY endDate DESC
+	</select>
+
+	
+
+	
+	
+	<resultMap type="FindBoard" id="boardResultMap">
+		<id property="no" column="no"/>
+		<result property="id" column="id"/>
+		<result property="title" column="title"/>
+		<result property="content" column="content"/>
+		<result property="regDate" column="reg_date"/>
+	</resultMap>
+	
+	<resultMap type="Reply" id="replyResultMap">
+		<id property="no" column="no"/>
+		<result property="id" column="id"/>
+		<result property="content" column="content"/>
+		<result property="regDate" column="reg_date"/>
+		<result property="boardNo" column="board_no"/>
+	</resultMap>
+	
+
+
+</mapper>
